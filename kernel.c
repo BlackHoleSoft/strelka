@@ -12,6 +12,7 @@
 #define FB_WIDTH                80
 #define FB_HEIGHT               25
 
+
 #define SERIAL_COM1_BASE                0x3F8      /* COM1 base port */
 
 #define SERIAL_DATA_PORT(base)          (base)
@@ -111,7 +112,7 @@ int abs(int num)
 {
     if(num >= 0)
     {
-        return num;        
+        return num;
     }
     else
     {
@@ -162,31 +163,31 @@ int sys_encode_gdt_entry(unsigned char *target, struct SysGDTEntry source)
     {
         return -1;
     }
-    if (source.limit > 65536) 
+    if (source.limit > 65536)
     {
         // Adjust granularity if required
         source.limit = source.limit >> 12;
         target[6] = 0xC0;
     }
-    else 
+    else
     {
         target[6] = 0x40;
     }
- 
+
     // Encode the limit
     target[0] = source.limit & 0xFF;
     target[1] = (source.limit >> 8) & 0xFF;
     target[6] |= (source.limit >> 16) & 0xF;
- 
-    // Encode the base 
+
+    // Encode the base
     target[2] = source.base & 0xFF;
     target[3] = (source.base >> 8) & 0xFF;
     target[4] = (source.base >> 16) & 0xFF;
     target[7] = (source.base >> 24) & 0xFF;
- 
+
     // And... Type
     target[5] = source.type;
-    
+
     return 0;
 }
 
@@ -194,28 +195,28 @@ void sys_init_gdt(void)
 {
     char gdt_size = 3;
     struct SysGDTEntry GDT[gdt_size];
-    
+
     GDT[0].base = 0;                     // Selector 0x00 cannot be used
     GDT[0].limit = 0;
     GDT[0].type = 0;
-    
+
     GDT[1].base = 0x0;                     // Selector 0x08 will be our code
     GDT[1].limit = 0xffffffff;
     GDT[1].type = 0x9A;
-    
+
     GDT[2].base = 0x0;                     // Selector 0x10 will be our data
     GDT[2].limit = 0xffffffff;
     GDT[2].type = 0x92;
-    
+
     //GDT[3] = {.base=&myTss, .limit=sizeof(myTss), .type=0x89};  // You can use LTR(0x18)
-    
+
     unsigned char *target = (unsigned char*) 0x130000;
-    
+
     for(int i=0; i<gdt_size; i++)
     {
         sys_encode_gdt_entry(&target[i*8], GDT[i]);
     }
-    
+
     set_gdt(&target[0], gdt_size * 8);
 }
 
@@ -232,14 +233,14 @@ unsigned long sys_get_idt_entry_high(unsigned int addr)
 void sys_init_idt(void)
 {
     //unsigned char *target = (unsigned char*) 0x140000;
-    
+
     unsigned int gdt[256];
-    
+
     gdt[0] = sys_get_idt_entry_high(0x150000);
     gdt[1] = sys_get_idt_entry_low(0x150000);
-    
+
     load_idt(gdt[0]);
-    
+
     asm volatile ("int $0x0");
 }*/
 
@@ -271,7 +272,7 @@ typedef struct __attribute__ ((packed)) {
 	unsigned char bank_size;		// deprecated; size of a bank, almost always 64 KB but may be 16 KB...
 	unsigned char image_pages;
 	unsigned char reserved0;
- 
+
 	unsigned char red_mask;
 	unsigned char red_position;
 	unsigned char green_mask;
@@ -281,36 +282,36 @@ typedef struct __attribute__ ((packed)) {
 	unsigned char reserved_mask;
 	unsigned char reserved_position;
 	unsigned char direct_color_attributes;
- 
+
 	unsigned int framebuffer;		// physical address of the linear frame buffer; write here to draw to the screen
 	unsigned int off_screen_mem_off;
 	unsigned short off_screen_mem_size;	// size of memory in the framebuffer but not being displayed on the screen
 	unsigned char reserved1[206];
 }  vbe_mode_info_structure;
- 
+
 // tell compiler our int32 function is external
 extern void int32(unsigned char intnum, regs16_t *regs);
- 
+
 // int32 test
 void int32_test()
 {
     regs16_t regs;
-     
+
     // switch to 320x200x256 graphics mode
     regs.ax = 0x0013;
     int32(0x10, &regs);
-     
+
     // full screen with blue color (1)
     char *buf = (char *)0xA0000;
     for(int i=0; i<320*200; i++)
     {
         buf[i] = 1;
     }
-     
+
     // wait for key
     regs.ax = 0x0000;
     int32(0x16, &regs);
-     
+
     // switch to 80x25x16 text mode
     regs.ax = 0x0003;
     int32(0x10, &regs);
@@ -350,7 +351,7 @@ void sys_init()
 //***********************************************
 
 char *conv_num_to_str(int val, char radix)
-{    
+{
     for(int i=0; i<16; i++)
     {
         char_buf[i] = 0;
@@ -358,25 +359,25 @@ char *conv_num_to_str(int val, char radix)
     int index = 14;
     int num = val;
     while(num != 0)
-    {     
+    {
         unsigned char d = abs(num%radix);
         char_buf[index] = (d>9)? d + 65 - 10 : d + 48;
         num /= radix;
         index--;
     }
     char_buf[index] = (val >= 0)?0x20:'-';
-    char_buf[15] = STR_END;    
-    
+    char_buf[15] = STR_END;
+
     for(int i=0; i<16-index; i++)
     {
         char_buf[i] = char_buf[index + i];
     }
-    
+
     return char_buf;
 }
 
 char *conv_unum_to_str(unsigned int val, char radix)
-{    
+{
     for(int i=0; i<16; i++)
     {
         char_buf[i] = 0;
@@ -384,20 +385,20 @@ char *conv_unum_to_str(unsigned int val, char radix)
     int index = 14;
     unsigned int num = val;
     while(num != 0)
-    {     
+    {
         unsigned char d = num%radix;
         char_buf[index] = (d>9)? d + 65 - 10 : d + 48;
         num /= radix;
         index--;
-    }    
+    }
     char_buf[index] = 0x20;
-    char_buf[15] = STR_END;    
-    
+    char_buf[15] = STR_END;
+
     for(int i=0; i<16-index; i++)
     {
         char_buf[i] = char_buf[index + i];
     }
-    
+
     return char_buf;
 }
 
@@ -420,7 +421,7 @@ unsigned char kb_read_scan_code(void)
 void vga_set_mode(unsigned short mode)
 {
     regs16_t regs;
-     
+
     // switch to graphics mode
     regs.ax = mode;
     int32(0x10, &regs);
@@ -494,7 +495,7 @@ void vbe_draw_border(char *fb, unsigned char r, unsigned char g, unsigned char b
 {
     vbe_draw_rect(fb, r, g, b, x, y, bw, h);
     vbe_draw_rect(fb, r, g, b, x, y, w, bw);
-    
+
     vbe_draw_rect(fb, r, g, b, x+w-bw, y, bw, h);
     vbe_draw_rect(fb, r, g, b, x, y+h-bw, w, bw);
 }
@@ -525,7 +526,7 @@ void vbe_draw_char(char *fb, int letter, unsigned char r, unsigned char g, unsig
             pos++;
         }
         pos += FONT_BM_WIDTH*FONT_WIDTH - FONT_WIDTH;
-    }    
+    }
 }
 
 vbe_mode_info_structure *vbe_set_mode(unsigned short mode)
@@ -533,48 +534,48 @@ vbe_mode_info_structure *vbe_set_mode(unsigned short mode)
     regs16_t regs;
     regs.ax = 0x4F02;
     regs.bx = mode | (1 << 14);
-    int32(0x10, &regs); 
-    
+    int32(0x10, &regs);
+
     if(regs.ax == 0x004F)
     {
         regs.ax = 0x4F01;
-        regs.cx = mode;  
+        regs.cx = mode;
         regs.di = 0x0000;
         regs.es = 0xA000;
         int32(0x10, &regs);
         if(regs.ax != 0x004F)
         {
-            vbe_back_to_text_mode();            
+            vbe_back_to_text_mode();
         }
-        
+
         vbe_mode_info_structure *vbe_info = (vbe_mode_info_structure*) 0xA0000;
-        
+
         vbe_width = vbe_info->width;
         vbe_height = vbe_info->height;
         vbe_bpp = vbe_info->bpp / 8;
         vbe_pitch = vbe_info->pitch;
-        
+
         /*char *fb = (char*) vbe_info->framebuffer;
         for(int i=0; i<640*480*3; i++)
         {
             fb[i] = 100;
         }
-        
+
         // wait for key
         regs.ax = 0x0000;
         int32(0x16, &regs);
-        
+
         // switch to 80x25x16 text mode
         regs.ax = 0x0003;
         int32(0x10, &regs);*/
-        
+
         return vbe_info;
     }
     else
     {
         vbe_back_to_text_mode();
     }
-    
+
     vbe_mode_info_structure vbe_info;
     return &vbe_info;
 }
@@ -593,16 +594,16 @@ void vbe_test_draw(char *fb)
 {
     vbe_draw_rect(fb, 255, 100, 200, 100, 100, 80, 50);
     vbe_draw_border(fb, 100, 100, 100, 100, 100, 80, 50, 4);
-    
-    vbe_draw_rect(fb, 100, 255, 130, 150, 130, 50, 80);                
+
+    vbe_draw_rect(fb, 100, 255, 130, 150, 130, 50, 80);
     vbe_draw_border(fb, 200, 200, 200, 150, 130, 50, 80, 1);
-    
+
     /*vbe_draw_char(fb, 1, 255, 255, 255, 10, 10);
     vbe_draw_char(fb, 16, 255, 255, 255, 30, 10);
     vbe_draw_char(fb, 33, 255, 255, 255, 50, 10);
     vbe_draw_char(fb, 49, 255, 255, 255, 70, 10);*/
-    
-    //char str[11] = "Hello VBE!\r";    
+
+    //char str[11] = "Hello VBE!\r";
 }
 
 
@@ -613,9 +614,9 @@ void vbe_test_draw(char *fb)
 void fb_write_symbol(unsigned int loc, char c, unsigned char bg, unsigned char fg)
 {
     char *fb = (char*) 0x000B8000;
-    
+
     loc *= FB_CELL_SIZE;
-    
+
     fb[loc] = c;
     fb[loc + 1] = ((fg & 0x0F) << 4) | (bg & 0x0F);
 }
@@ -669,68 +670,68 @@ void fb_move_cursor(unsigned short pos)
 
 
 unsigned int kernel_main(void)
-{    
+{
     sys_init();
-    
+
     fb_clear_screen(0xF);
-    
+
     char name[21] = "STRELKA System v0.1\r";
     fb_write_string(name, 80/2 - 10, 12, 0x1, 0x7);
-    fb_write_string(conv_num_to_str(0x2018, 16), 0, 0, 0x1, 0x7); 
-    
+    fb_write_string(conv_num_to_str(0x2018, 16), 0, 0, 0x1, 0x7);
+
     char info[60] = "F1-F4 - Change video mode. Press ENTER to continue\r";
     fb_write_string(info, 80/2 - 25, 13, 0x1, 0x7);
-    
-    //int32_test();    
-    
+
+    //int32_test();
+
     while(1)
     {
         unsigned char code = kb_read_scan_code();
         if(code != 1)
-        {      
+        {
             if(code == 0x1C) //enter
             {
-                
+
             }
-            
+
             if(code == 0x3B) //F1
             {
                 vbe_mode_info_structure *vbe_info = vbe_set_mode(VBE_MODE_640X480);
-                
+
                 char *fb = (char*) vbe_info->framebuffer;
                 vbe_clear_screen(fb, 170, 165, 210);
-                
+
                 vbe_draw_string(fb, conv_unum_to_str(vbe_info->framebuffer, 16), 100, 100, 255, 10, 30);
-                vbe_test_draw(fb);                
+                vbe_test_draw(fb);
             }
             /*if(code == 0x3C)
             {
                 vbe_mode_info_structure *vbe_info = vbe_set_mode(VBE_MODE_800X600);
-                
+
                 char *fb = (char*) vbe_info->framebuffer;
                 vbe_clear_screen(fb, 170, 165, 210);
-                
+
                 vbe_test_draw(fb);
             }
             if(code == 0x3D)
             {
                 vbe_mode_info_structure *vbe_info = vbe_set_mode(VBE_MODE_1024X768);
-                
+
                 char *fb = (char*) vbe_info->framebuffer;
                 vbe_clear_screen(fb, 170, 165, 210);
-                
+
                 vbe_test_draw(fb);
             }
             if(code == 0x3E)
             {
                 vbe_mode_info_structure *vbe_info = vbe_set_mode(VBE_MODE_1280X1024);
-                
+
                 char *fb = (char*) vbe_info->framebuffer;
                 vbe_clear_screen(fb, 170, 165, 210);
-                
+
                 vbe_test_draw(fb);
             }
-            
+
             if(code == 5)
             {
                 int32_test();
@@ -757,7 +758,7 @@ unsigned int kernel_main(void)
             break;
         }
     }
-    
+
     return 0xCAFEFACA;
     //return sys_memory_size();
     //return vbe_set_mode(VBE_STANDARD_MODE);
