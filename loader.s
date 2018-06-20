@@ -1,50 +1,60 @@
-global loader                   ; the entry symbol for ELF
-global outb
-global inb
-global set_gdt
-global load_idt
-global bios_test
-extern kernel_main
-extern interrupt_handler
-
 ;Napalm - access bios from pmode!!!
 
-section .__mbHeader: 
+section .__mbHeader
+  align 0x4                         ; the code must be 4 byte aligned
+  mboot:
 
-MAGIC_NUMBER equ 0x1BADB002     ; define the magic number constant
-FLAGS        equ  0      ; multiboot flags
-CHECKSUM     equ -(MAGIC_NUMBER + FLAGS)  ; calculate the checksum
-                                ; (magic number + checksum + flags should equal 0)
+    MAGIC_NUMBER equ 0x1BADB002     ; define the magic number constant
+    FLAGS        equ  0      ; multiboot flags
+    CHECKSUM     equ -(MAGIC_NUMBER + FLAGS)  ; calculate the checksum
+                                  ; (magic number + checksum + flags should equal 0)
 
-align 0x4                         ; the code must be 4 byte aligned
     dd MAGIC_NUMBER             ; write the magic number to the machine code,
     dd FLAGS                    ; the flags,
-    dd CHECKSUM                 ; and the checksum  
-    
+    dd CHECKSUM                 ; and the checksum
+
+    dd mboot
+    dd $$
+    dd bss
+    dd kernel_end
+    dd kernel_start
+
     ;dd 0
     ;dd 0
     ;dd 0
     ;dd 0
     ;dd 0
-    
+
     ;dd 0
     ;dd 640 ;width
     ;dd 480 ;height
     ;dd 24 ;bpp
-                                
+
+    ;resb 1024*8 - 4*3
+
 section .bss
-
-KERNEL_STACK_SIZE equ 4096      ; size of stack in bytes  
-
 align 4                                     ; align at 4 bytes
+bss:
+
+KERNEL_STACK_SIZE equ 4096      ; size of stack in bytes
+
 kernel_stack:                               ; label points to beginning of memory
-        resb KERNEL_STACK_SIZE                  ; reserve stack for the kernel        
+        resb KERNEL_STACK_SIZE                  ; reserve stack for the kernel
 
-        
-section .text:                  ; start of the text (code) section
 
-    
-    
+section .text                  ; start of the text (code) section
+align 0x4
+  kernel_start:
+
+    global loader                   ; the entry symbol for ELF
+    global outb
+    global inb
+    global set_gdt
+    global load_idt
+    global bios_test
+    extern kernel_main
+    extern interrupt_handler
+
 ; outb - send a byte to an I/O port
 ; stack: [esp + 8] the data byte
 ;        [esp + 4] the I/O port
@@ -55,7 +65,7 @@ section .text:                  ; start of the text (code) section
 ;    push    eax
 ;    push    ebx
 ;    push    ecx
-;    push    edx    
+;    push    edx
 ;    push    ebp
 
     ; call the C function
@@ -63,7 +73,7 @@ section .text:                  ; start of the text (code) section
 
     ; restore the registers
 ;    pop     ebp
-    
+
 ;    pop     edx
 ;    pop     ecx
 ;    pop     ebx
@@ -74,12 +84,12 @@ section .text:                  ; start of the text (code) section
 
     ; return to the code that got interrupted
 ;    iret
-    
+
 
 
 gdtr DW 0 ; For limit storage
      DD 0 ; For base storage
- 
+
 set_gdt:
    MOV   EAX, [esp + 4]
    MOV   [gdtr + 2], EAX
@@ -87,8 +97,8 @@ set_gdt:
    MOV   [gdtr], AX
    LGDT  [gdtr]
    JMP   0x08:reload_CS ; 0x08 points at the new code selector
-   RET   
-   
+   RET
+
 reload_CS:
    ; Reload data segment registers:
    MOV   AX, 0x10 ; 0x10 points at the new data selector
@@ -104,36 +114,38 @@ outb:
     mov dx, [esp + 4]    ; move the address of the I/O port into the dx register
     out dx, al           ; send the data to the I/O port
     ret                  ; return to the calling function
-    
+
 inb:
     mov dx, [esp + 4]       ; move the address of the I/O port to the dx register
     xor al, al
     in  al, dx              ; read a byte from the I/O port and store it in the al register
     ret                     ; return the read byte
-    
+
 load_idt:
     mov     eax, [esp+4]    ; load the address of the IDT into register eax
     lidt    [eax]            ; load the IDT
     ret                     ; return to the calling function
-    
+
 bios_test:
     mov ah, 0x0e    ; function number = 0Eh : Display Character
     mov al, '!'     ; AL = code of character to display
     int 0x10        ; call INT 10h, BIOS video service
 
 
-loader:                         ; the loader label (defined as entry point in linker script)   
+loader:                         ; the loader label (defined as entry point in linker script)
     mov esp, kernel_stack + KERNEL_STACK_SIZE   ; init stack at the end position esp - stack poiner
-    
+
     ;no_error_code_interrupt_handler 0       ; create handler for interrupt 0
-    
+
     ;push ebx
     call kernel_main
-    
+
+kernel_end:
+
 loop:
     jmp loop
-    
-    
+
+
 ;
 ; Protected Mode BIOS Call Functionailty v2.0 - by Napalm
 ; -------------------------------------------------------
@@ -145,7 +157,7 @@ loop:
 ; to the license at the following URL.
 ;
 ; License: http://creativecommons.org/licenses/by-sa/2.0/uk/
-;         
+;
 ; Notes: This file is in NASM syntax.
 ;        Turn off paging before calling these functions.
 ;        int32() resets all selectors.
@@ -278,13 +290,13 @@ section .text
       cld                                    ; clear direction flag (so we copy forward)
       rep  movsb                             ; do the actual copy (16bit stack to 32bit stack)
       popa                                   ; restore registers
-      ;sti                                    ; enable interrupts      
+      ;sti                                    ; enable interrupts
       ;ret                                    ; return to caller
-      
+
       JMP   0x08:reload_CS
       ret
-      
-      
+
+
    resetpic:                                  ; reset's 8259 master and slave pic vectors
       push ax                                ; expects bh = master vector, bl = slave vector
       mov  al, 0x11                          ; 0x11 = ICW1_INIT | ICW1_ICW4
@@ -303,27 +315,27 @@ section .text
       out  0xA1, al                          ; send ICW4 to slave pic
       pop  ax                                ; restore ax from stack
       ret                                    ; return to caller
-      
+
    stack32_ptr:                               ; address in 32bit stack after we
       dd 0x00000000                          ;   save all general purpose registers
-      
+
    idt32_ptr:                                 ; IDT table pointer for 32bit access
       dw 0x0000                              ; table limit (size)
       dd 0x00000000                          ; table base address
-      
+
    gdt32_ptr:                                 ; GDT table pointer for 32bit access
       dw 0x0018                              ; table limit (size)
       dd 0x00130000                          ; table base address
-      
+
    idt16_ptr:                                 ; IDT table pointer for 16bit access
       dw 0x03FF                              ; table limit (size)
       dd 0x00000000                          ; table base address
-      
+
    gdt16_base:                                ; GDT descriptor table
       .null:                                 ; 0x00 - null segment descriptor
          dd 0x00000000                      ; must be left zero'd
          dd 0x00000000                      ; must be left zero'd
-         
+
       .code32:                               ; 0x01 - 32bit code segment descriptor 0xFFFFFFFF
          dw 0xFFFF                          ; limit  0:15
          dw 0x0000                          ; base   0:15
@@ -331,7 +343,7 @@ section .text
          db 0x9A                            ; present, iopl/0, code, execute/read
          db 0xCF                            ; 4Kbyte granularity, 32bit selector; limit 16:19
          db 0x00                            ; base  24:31
-         
+
       .data32:                               ; 0x02 - 32bit data segment descriptor 0xFFFFFFFF
          dw 0xFFFF                          ; limit  0:15
          dw 0x0000                          ; base   0:15
@@ -339,7 +351,7 @@ section .text
          db 0x92                            ; present, iopl/0, data, read/write
          db 0xCF                            ; 4Kbyte granularity, 32bit selector; limit 16:19
          db 0x00                            ; base  24:31
-         
+
       .code16:                               ; 0x03 - 16bit code segment descriptor 0x000FFFFF
          dw 0xFFFF                          ; limit  0:15
          dw 0x0000                          ; base   0:15
@@ -347,7 +359,7 @@ section .text
          db 0x9A                            ; present, iopl/0, code, execute/read
          db 0x0F                            ; 1Byte granularity, 16bit selector; limit 16:19
          db 0x00                            ; base  24:31
-         
+
       .data16:                               ; 0x04 - 16bit data segment descriptor 0x000FFFFF
          dw 0xFFFF                          ; limit  0:15
          dw 0x0000                          ; base   0:15
@@ -355,10 +367,9 @@ section .text
          db 0x92                            ; present, iopl/0, data, read/write
          db 0x0F                            ; 1Byte granularity, 16bit selector; limit 16:19
          db 0x00                            ; base  24:31
-         
+
    gdt16_ptr:                                 ; GDT table pointer for 16bit access
       dw gdt16_ptr - gdt16_base - 1          ; table limit (size)
       dd gdt16_base                          ; table base address
-      
+
    int32_end:                                 ; end marker (so we can copy the code)
-   
